@@ -1,4 +1,4 @@
-<?
+<?php
 /**
  * Bitrix Framework
  * @package    bitrix
@@ -79,54 +79,71 @@ if ($arResult["SHOW_SMS_FIELD"] == true) {
 </script>
 
 <div class="bx-auth-reg">
-    
     <?php if ($USER->IsAuthorized()): ?>
 
         <p><?php echo GetMessage("MAIN_REGISTER_AUTH") ?></p>
         
         <?php if ($arResult['LOYALTY_STATUS'] === 'Y'): ?>
         <?php $this->addExternalJs(SITE_TEMPLATE_PATH . '/script.js'); ?>
+        <div id="regBody">
+            <?php if (isset($arResult['LP_REGISTER']['msg'])) { ?>
+                <div id="lpRegMsg" class="lpRegMsg"><?=$arResult['LP_REGISTER']['msg']?></div>
+            <?php } ?>
         
-        <?php if (isset($arResult['LP_REGISTER']['msg'])) { ?>
-        <div id="lpRegMsg" class="lpRegMsg"><?=$arResult['LP_REGISTER']['msg']?></div>
-    <?php } ?>
-        
-        <?php
-    if (isset($arResult['LP_REGISTER']['form']['fields'])) { ?>
-        <div id="lpRegForm">
-            <div id="errMsg"></div>
-            <form id="lpRegFormInputs">
-                <?php
-                foreach ($arResult['LP_REGISTER']['form']['fields'] as $key => $field) {
-                    ?>
-                    <label>
-                        <input
-                            name="<?=$key?>"
-                            type="<?=$field['type']?>"
-                            <?php if (isset($field['value'])) { ?>
-                                value="<?=$field['value']?>"
-                            <?php } ?>
-                        >
-                
+            <?php
+            if (isset($arResult['LP_REGISTER']['form']['fields'])) { ?>
+                <div id="lpRegForm">
+                    <div id="errMsg"></div>
+                    <form id="lpRegFormInputs">
                         <?php
-                        if ($key === 'UF_AGREE_PL_INTARO') { ?>
-                        <?=GetMessage('I_AM_AGREE')?><a class="lp_agreement_link" href="javascript:void(0)">
-                            <?php } ?>
-                        <?php
-                        if ($key === 'UF_PD_PROC_PL_INTARO') { ?>
-                        <?=GetMessage('I_AM_AGREE')?><a class="personal_data_agreement_link" href="javascript:void(0)">
-                            <?php } ?>
-                                <?=GetMessage($key)?>
+                        foreach ($arResult['LP_REGISTER']['form']['fields'] as $key => $field) {
+                            ?>
+                            <label>
+                                <input
+                                    name="<?=$key?>"
+                                    id="<?=$key?>Field"
+                                    type="<?=$field['type']?>"
+                                    <?php if (isset($field['value'])) { ?>
+                                        value="<?=$field['value']?>"
+                                    <?php } ?>
+                                >
                                 <?php
-                                if ($key === 'UF_PD_PROC_PL_INTARO' || $key === 'UF_AGREE_PL_INTARO') { ?></a><?php } ?>
-                    </label>
-                    <br>
-                <?php } ?>
-            </form>
-            <input type="button" onclick="<?=$arResult['LP_REGISTER']['form']['button']['action']?>()" value="<?=GetMessage('SEND')?>">
+                                if ($key === 'UF_AGREE_PL_INTARO') { ?>
+                                <?=GetMessage('I_AM_AGREE')?><a class="lp_agreement_link" href="javascript:void(0)">
+                                    <?php } ?>
+                                    <?php
+                                    if ($key === 'UF_PD_PROC_PL_INTARO') { ?>
+                                <?=GetMessage('I_AM_AGREE')?><a class="personal_data_agreement_link" href="javascript:void(0)">
+                                        <?php } ?>
+                                        <?=GetMessage($key)?>
+                                        <?php
+                                        if ($key === 'UF_PD_PROC_PL_INTARO' || $key === 'UF_AGREE_PL_INTARO') { ?></a><?php } ?>
+                            </label>
+                        <?php
+                        if ($field['type'] === 'checkbox') { ?>
+                            <br>
+                            <?php } ?>
+                        <?php } ?>
+                    </form>
+                    <?php
+                    if (isset($arResult['LP_REGISTER']['resendAvailable']) && !empty($arResult['LP_REGISTER']['resendAvailable'])) {
+                        CUtil::InitJSCore(['intaro_countdown']);
+                        ?>
+                        <script>
+                            $(function() {
+                                const deadline = new Date('<?= $arResult['LP_REGISTER']['resendAvailable'] ?>');
+                                initializeClock("countdown", deadline);
+                            });
+                        </script>
+                        <div id="countdownDiv"> <?=GetMessage('RESEND_POSSIBLE')?> <span id="countdown"></span> <?=GetMessage('SEC')?></div>
+                        <div id="deadlineMessage" style="display: none;">
+                            <input type="button" onclick="resendRegisterSms(<?=$arResult['LP_REGISTER']['idInLoyalty']?>)" value="<?=GetMessage('RESEND_SMS')?>">
+                        </div>
+                    <?php } ?>
+                    <input type="button" onclick="<?=$arResult['LP_REGISTER']['form']['button']['action']?>()" value="<?=GetMessage('SEND')?>">
+                </div>
+            <?php } ?>
         </div>
-    <?php } ?>
-    
     <?php endif; ?>
     
     <?php else: ?>

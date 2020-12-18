@@ -20,8 +20,6 @@ use Bitrix\Main\HttpRequest;
 use Bitrix\Main\ObjectPropertyException;
 use Bitrix\Main\SystemException;
 use Bitrix\Sale\Order;
-use CUser;
-use Intaro\RetailCrm\Component\Builder\Api\CustomerBuilder;
 use Intaro\RetailCrm\Component\ConfigProvider;
 use Intaro\RetailCrm\Component\ServiceLocator;
 use Intaro\RetailCrm\Repository\UserRepository;
@@ -46,75 +44,6 @@ class EventsHandlers
     }
     
     /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnBeforeSalePaymentSetFieldHandler(Event $event): void
-    {
-        AddMessage2Log('OnBeforeSalePaymentSetFieldHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @return mixed
-     */
-    public function OnBeforeEndBufferContentHandler()
-    {
-        AddMessage2Log('OnBeforeEndBufferContentHandler work! ');
-    }
-    
-    /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnSaleOrderBeforeSavedHandler(Event $event): void
-    {
-        AddMessage2Log('OnSaleOrderBeforeSavedHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnSaleOrderPaidHandler(Event $event): void
-    {
-        AddMessage2Log('OnSaleOrderPaidHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnSaleStatusOrderChangeHandler(Event $event): void
-    {
-        AddMessage2Log('OnSaleStatusOrderChangeHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnSaleOrderCanceledHandler(Event $event): void
-    {
-        AddMessage2Log('OnSaleOrderCanceledHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @param \Bitrix\Main\Event $event
-     */
-    public function OnSaleOrderDeletedHandler(Event $event): void
-    {
-        AddMessage2Log('OnSaleOrderDeletedHandler work! ' . $event->getDebugInfo());
-    }
-    
-    /**
-     * @param $arResult
-     * @param $arUserResult
-     * @param $arParams
-     *
-     * @return mixed
-     */
-    public function OnSaleComponentOrderOneStepProcessHandler($arResult, $arUserResult, $arParams)
-    {
-        AddMessage2Log('OnSaleComponentOrderOneStepProcessHandler work! ' . $arUserResult . $arParams);
-        return $arResult;
-    }
-    
-    /**
      * Обработчик события, вызываемого при обновлении еще не сохраненного заказа
      *
      * @param \Bitrix\Sale\Order       $order
@@ -128,19 +57,22 @@ class EventsHandlers
         if (ConfigProvider::getLoyaltyProgramStatus() === 'Y') {
             $bonusInput       = (int)$request->get('bonus-input');
             $availableBonuses = (int)$request->get('available-bonuses');
-    
+            $chargeRate       = (int)$request->get('charge-rate');
+
             if ($bonusInput > $availableBonuses) {
                 $arResult['LOYALTY']['ERROR'] = GetMessage('BONUS_ERROR_MSG');
                 return;
             }
             
+            $bonusDiscount = $bonusInput * $chargeRate;
+            
             if ($bonusInput > 0
                 && $availableBonuses > 0
-                && $arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE'] >= $bonusInput
+                && $arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE'] >= $bonusDiscount
             ) {
-                $arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE']          -= $bonusInput;
+                $arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE']          -= $bonusDiscount;
                 $arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE_FORMATED'] = number_format($arResult['JS_DATA']['TOTAL']['ORDER_TOTAL_PRICE'], 0, ',', ' ');
-                $arResult['JS_DATA']['TOTAL']['BONUS_PAYMENT']              = $bonusInput;
+                $arResult['JS_DATA']['TOTAL']['BONUS_PAYMENT']              = $bonusDiscount;
             }
         }
     }
@@ -155,7 +87,6 @@ class EventsHandlers
         /* @var LoyaltyService $loyaltyService*/
         $loyaltyService = ServiceLocator::get(LoyaltyService::class);
         $retailCrmEvent = new RetailCrmEvent();
-        
         try {
             // TODO: Replace old call with a new one.
             $retailCrmEvent->orderSave($event);
@@ -166,7 +97,11 @@ class EventsHandlers
                 && $isNew
                 && (int)$_POST['available-bonuses'] >= (int)$_POST['bonus-input']
             ) {
-                $loyaltyService->applyBonusesInOrder($event);
+                $rate       = isset($_POST['charge-rate']) ? htmlspecialchars(trim($_POST['charge-rate'])) : 1;
+                $bonusCount = (int)$_POST['bonus-input'] * $rate;
+                $order      = $event->getParameter("ENTITY");
+                
+                $loyaltyService->applyBonusesInOrder($order, $bonusCount, $rate);
             }
         } catch (ObjectPropertyException | ArgumentException | SystemException $e) {
             AddMessage2Log(GetMessage('CAN_NOT_SAVE_ORDER') . $e->getMessage());
